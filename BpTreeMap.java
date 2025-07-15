@@ -378,7 +378,13 @@ public class BpTreeMap <K extends Comparable <K>, V>
             rt = insert (key, ref, (Node) n.ref[n.find (key)]);       // recursive call to insert
             if (DEBUG) out.println ("insert: handle internal node level");
 
-                //  T O   B E   I M P L E M E N T E D
+            if (rt != null) {                                        // child split -> add to this node
+                var rrt = addI (n, rt.key[0], rt);                    // insert divider key
+                if (rrt != null) {                                    // this node also split
+                    if (n != root) return rrt;
+                    root = new Node (root, rrt.key[0], rrt);          // create new root
+                } // if
+            } // if
 
         } // if
 
@@ -412,10 +418,39 @@ public class BpTreeMap <K extends Comparable <K>, V>
     {
         Node rt = null;                                               // holder for right sibling rt
 
-                //  T O   B E   I M P L E M E N T E D
-
+        n.add (k, v);                                                 // add into internal node
+        if (n.overflow ()) rt = n.splitI ();                          // full => split node
         return rt;
     } // addI
+
+    /**********************************************************************
+     * Delete the given key from this B+Tree map.  Only handles removal from
+     * a leaf node without re-balancing.
+     * @param k  the key to delete
+     * @return the value associated with the deleted key or null
+     */
+    @SuppressWarnings("unchecked")
+    public V delete (K k)
+    {
+        var np = findp (k, root);
+        if (np.pos < 0) return null;                                  // not found
+
+        var n = (Node) np.node;
+        V old = (V) n.ref[np.pos + 1];
+        for (int i = np.pos; i < n.keys - 1; i++) {
+            n.key[i]   = n.key[i+1];
+            n.ref[i+1] = n.ref[i+2];
+        }
+        n.key[n.keys - 1] = null;
+        n.ref[n.keys] = null;
+        n.keys -= 1;
+        kCount -= 1;
+        return old;
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public V remove (Object key) { return delete ((K) key); }
     
 //-----------------------------------------------------------------------------------
 // Print/show the B+Tree
@@ -474,6 +509,15 @@ public class BpTreeMap <K extends Comparable <K>, V>
         out.println ("number of keys in BpTree = " + bpt.kCount);
         out.println ("-------------------------------------------");
         out.println ("Average number of nodes accessed = " + bpt.count / (double) totalKeys);
+
+        int expectedSize = (totalKeys + 1) / 2;
+        assert bpt.size () == expectedSize : "Size mismatch";
+        for (var i = 1; i <= 13; i += 2) {
+            assert bpt.get (i) != null && bpt.get (i).equals (i * i) : "Incorrect value for " + i;
+        }
+        for (var i = 0; i <= totalKeys; i += 2) {
+            assert bpt.get (i) == null : "Unexpected value for " + i;
+        }
     } // main
 
 } // BpTreeMap
