@@ -387,12 +387,21 @@ public class BpTreeMap <K extends Comparable <K>, V>
             Split csp = insert (key, ref, (Node) n.ref[n.find (key)]); // recursive call to insert
             if (DEBUG) out.println ("insert: handle internal node level");
 
+\zu9bve-codex/implement-bptreemap-insert,-addi,-and-delete
             if (csp != null) {                                       // child split -> add to this node
                 sp = addI (n, csp.dk, csp.rt);                        // insert divider key
                 if (sp != null && n == root) {                        // this node split as well
                     root = new Node (root, sp.dk, sp.rt);             // create new root
                     sp = null;
                 }
+
+            if (rt != null) {                                        // child split -> add to this node
+                var rrt = addI (n, rt.key[0], rt);                    // insert divider key
+                if (rrt != null) {                                    // this node also split
+                    if (n != root) return rrt;
+                    root = new Node (root, rrt.key[0], rrt);          // create new root
+                } // if
+ main
             } // if
 
         } // if
@@ -428,9 +437,15 @@ public class BpTreeMap <K extends Comparable <K>, V>
         n.add (k, v);                                                 // add into internal node
         if (! n.overflow ()) return null;
 
+ zu9bve-codex/implement-bptreemap-insert,-addi,-and-delete
         var dk = n.key[LiHALF];                                       // divider key to promote
         var rt = n.splitI ();                                         // split current node
         return new Split (dk, rt);                                    // return divider key and new node
+
+        n.add (k, v);                                                 // add into internal node
+        if (n.overflow ()) rt = n.splitI ();                          // full => split node
+        return rt;
+main
     } // addI
 
     /**********************************************************************
@@ -499,6 +514,7 @@ public class BpTreeMap <K extends Comparable <K>, V>
      * The main method used for testing.  Also test for more keys and with RANDOMLY true.
      * @param  the command-line arguments (args[0] gives number of keys to insert)
      */
+zu9bve-codex/implement-bptreemap-insert,-addi,-and-delete
     public static void main (String [] args)
     {
         var totalKeys = 30;                    
@@ -529,6 +545,64 @@ public class BpTreeMap <K extends Comparable <K>, V>
             assert bpt.get (i) == null : "Unexpected value for " + i;
         }
     } // main
+
+    public static void main(String[] args) {
+        // reference map
+        TreeMap<Integer,Integer> ref = new TreeMap<>();
+        // your B+‑tree
+        BpTreeMap<Integer,Integer> bpt = new BpTreeMap<>(Integer.class, Integer.class);
+    
+        // 1) INSERT TESTS
+        for (int k = 1; k <= 50; k++) {
+            int v = k * 10;
+            bpt.put(k, v);
+            ref.put(k, v);
+            // size must stay in sync
+            assert bpt.size() == ref.size()
+                : String.format("Size mismatch after put(%d): expected %d got %d",
+                                k, ref.size(), bpt.size());
+        }
+    
+        // 2) GET TESTS (existing keys)
+        for (int k = 1; k <= 50; k++) {
+            Integer ev = ref.get(k);
+            Integer bv = bpt.get(k);
+            assert Objects.equals(bv, ev)
+                : String.format("Value mismatch at key %d: expected %d got %d",
+                                k, ev, bv);
+        }
+    
+        // 3) GET TESTS (absent keys)
+        for (int k = 100; k < 110; k++) {
+            assert bpt.get(k) == null
+                : "Expected null for missing key " + k;
+        }
+    
+        System.out.println("✅ Insert/get tests passed.");
+    
+        // 4) REMOVE TESTS
+        int[] toRemove = { 5, 20, 35 };
+        for (int k : toRemove) {
+            Integer rb = bpt.remove(k);
+            Integer rr = ref.remove(k);
+            assert Objects.equals(rb, rr)
+                : String.format("Remove mismatch at key %d: expected %s got %s",
+                                k, rr, rb);
+        }
+    
+        // 5) POST‑REMOVE GET TESTS
+        for (int k = 1; k <= 50; k++) {
+            Integer ev = ref.get(k);
+            Integer bv = bpt.get(k);
+            assert Objects.equals(bv, ev)
+                : String.format("Post-remove mismatch at key %d: expected %s got %s",
+                                k, ev, bv);
+        }
+    
+        System.out.println("✅ Remove tests passed. All checks OK!");
+    }
+    
+ main
 
 } // BpTreeMap
 
