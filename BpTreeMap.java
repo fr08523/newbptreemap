@@ -199,12 +199,12 @@ public class BpTreeMap <K extends Comparable <K>, V>
         {
             var rt = new Node (RiHALF, false);                          // allocate internal right sibling node (rt)
             for (var i = 0; i < RiHALF; i++) {                          // move largest half of keys (with refs) to rt
-                rt.key[i] = key[LiHALF + i];
-                rt.ref[i] = ref[LiHALF + i];
+                rt.key[i] = key[LiHALF + 1 + i];                       // skip divider key
+                rt.ref[i] = ref[LiHALF + 1 + i];
             } // for
             rt.ref[RiHALF] = ref[keys];                                 // copy over the last ref
             keys = LiHALF;                                             // reset number of active keys to LiHALF
-            return rt;                                                  // divider key (middle key) in right sibling
+            return rt;                                                  // divider key (smallest right) in right sibling
         } // splitI
 
         /****************************************************************************
@@ -305,6 +305,12 @@ public class BpTreeMap <K extends Comparable <K>, V>
 
     record NodePos (Object node, int pos) {}                          // as records are implicitly static, can't use 'Node node'
 
+    private class Split {                                             // holder for split results
+        final K   dk;                                                 // divider key to push up
+        final Node rt;                                                // right sibling node
+        Split (K dk, Node rt) { this.dk = dk; this.rt = rt; }
+    } // Split
+
     /********************************************************************************
      * Find the given key in this B+tree and return its corresponding value.
      * Calls the recursive findp method.
@@ -356,27 +362,38 @@ public class BpTreeMap <K extends Comparable <K>, V>
      * @param key  the key to insert
      * @param ref  the value/node to insert
      * @param n    the current node
-     * @return  the newly allocated right sibling node of n 
+     * @return  split information for node n if a split occurred; null otherwise
      */
     @SuppressWarnings("unchecked")
-    private Node insert (K key, V ref, Node n)
+    private Split insert (K key, V ref, Node n)
     {
         out.println ("=============================================================");
         out.println ("insert: key " + key);
         out.println ("=============================================================");
 
-        Node rt = null;                                               // holder right sibling node
+        Split sp = null;                                              // holder for split info
 
         if (n.isLeaf) {                                               // handle LEAF node level
-            rt = add (n, key, ref);
+            Node rt = add (n, key, ref);
             if (rt != null) {
-                if (n != root) return rt;
-                root = new Node (root, rt.key[0], rt);                // make a new root
+                sp = new Split (rt.key[0], rt);
+                if (n == root) {                                     // create new root
+                    root = new Node (root, sp.dk, sp.rt);
+                    sp = null;
+                }
             } // if
 
         } else {                                                      // handle INTERNAL node level
-            rt = insert (key, ref, (Node) n.ref[n.find (key)]);       // recursive call to insert
+            Split csp = insert (key, ref, (Node) n.ref[n.find (key)]); // recursive call to insert
             if (DEBUG) out.println ("insert: handle internal node level");
+
+\zu9bve-codex/implement-bptreemap-insert,-addi,-and-delete
+            if (csp != null) {                                       // child split -> add to this node
+                sp = addI (n, csp.dk, csp.rt);                        // insert divider key
+                if (sp != null && n == root) {                        // this node split as well
+                    root = new Node (root, sp.dk, sp.rt);             // create new root
+                    sp = null;
+                }
 
             if (rt != null) {                                        // child split -> add to this node
                 var rrt = addI (n, rt.key[0], rt);                    // insert divider key
@@ -384,12 +401,13 @@ public class BpTreeMap <K extends Comparable <K>, V>
                     if (n != root) return rrt;
                     root = new Node (root, rrt.key[0], rrt);          // create new root
                 } // if
+ main
             } // if
 
         } // if
 
         if (DEBUG) printT (root, 0);
-        return rt;                                                    // return right sibling node
+        return sp;                                                    // return split info
     } // insert
 
     /********************************************************************************
@@ -414,13 +432,20 @@ public class BpTreeMap <K extends Comparable <K>, V>
      * @param k  the new key
      * @param v  the new left value (ref a node)
      */
-    private Node addI (Node n, K k, Node v)
+    private Split addI (Node n, K k, Node v)
     {
-        Node rt = null;                                               // holder for right sibling rt
+        n.add (k, v);                                                 // add into internal node
+        if (! n.overflow ()) return null;
+
+ zu9bve-codex/implement-bptreemap-insert,-addi,-and-delete
+        var dk = n.key[LiHALF];                                       // divider key to promote
+        var rt = n.splitI ();                                         // split current node
+        return new Split (dk, rt);                                    // return divider key and new node
 
         n.add (k, v);                                                 // add into internal node
         if (n.overflow ()) rt = n.splitI ();                          // full => split node
         return rt;
+main
     } // addI
 
     /**********************************************************************
@@ -489,6 +514,38 @@ public class BpTreeMap <K extends Comparable <K>, V>
      * The main method used for testing.  Also test for more keys and with RANDOMLY true.
      * @param  the command-line arguments (args[0] gives number of keys to insert)
      */
+zu9bve-codex/implement-bptreemap-insert,-addi,-and-delete
+    public static void main (String [] args)
+    {
+        var totalKeys = 30;                    
+        var RANDOMLY  = false;
+        var rng       = new Random ();
+        var bpt       = new BpTreeMap <Integer, Integer> (Integer.class, Integer.class);
+        if (args.length == 1) totalKeys = Integer.valueOf (args[0]);
+   
+        if (RANDOMLY)
+            for (var i = 1; i <= totalKeys; i += 2) bpt.put (rng.nextInt (2 * totalKeys), i * i);
+        else
+            for (var i = 1; i <= totalKeys; i += 2) bpt.put (i, i * i);
+
+        bpt.printT (bpt.root, 0);
+        for (var i = 0; i <= totalKeys; i++)
+            out.println ("key = " + i + ", value = " + bpt.get (i));
+        out.println ("-------------------------------------------");
+        out.println ("number of keys in BpTree = " + bpt.kCount);
+        out.println ("-------------------------------------------");
+        out.println ("Average number of nodes accessed = " + bpt.count / (double) totalKeys);
+
+        int expectedSize = (totalKeys + 1) / 2;
+        assert bpt.size () == expectedSize : "Size mismatch";
+        for (var i = 1; i <= 13; i += 2) {
+            assert bpt.get (i) != null && bpt.get (i).equals (i * i) : "Incorrect value for " + i;
+        }
+        for (var i = 0; i <= totalKeys; i += 2) {
+            assert bpt.get (i) == null : "Unexpected value for " + i;
+        }
+    } // main
+
     public static void main(String[] args) {
         // reference map
         TreeMap<Integer,Integer> ref = new TreeMap<>();
@@ -545,6 +602,7 @@ public class BpTreeMap <K extends Comparable <K>, V>
         System.out.println("✅ Remove tests passed. All checks OK!");
     }
     
+ main
 
 } // BpTreeMap
 
