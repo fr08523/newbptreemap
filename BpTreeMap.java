@@ -489,36 +489,62 @@ public class BpTreeMap <K extends Comparable <K>, V>
      * The main method used for testing.  Also test for more keys and with RANDOMLY true.
      * @param  the command-line arguments (args[0] gives number of keys to insert)
      */
-    public static void main (String [] args)
-    {
-        var totalKeys = 30;                    
-        var RANDOMLY  = false;
-        var rng       = new Random ();
-        var bpt       = new BpTreeMap <Integer, Integer> (Integer.class, Integer.class);
-        if (args.length == 1) totalKeys = Integer.valueOf (args[0]);
-   
-        if (RANDOMLY)
-            for (var i = 1; i <= totalKeys; i += 2) bpt.put (rng.nextInt (2 * totalKeys), i * i);
-        else
-            for (var i = 1; i <= totalKeys; i += 2) bpt.put (i, i * i);
-
-        bpt.printT (bpt.root, 0);
-        for (var i = 0; i <= totalKeys; i++)
-            out.println ("key = " + i + ", value = " + bpt.get (i));
-        out.println ("-------------------------------------------");
-        out.println ("number of keys in BpTree = " + bpt.kCount);
-        out.println ("-------------------------------------------");
-        out.println ("Average number of nodes accessed = " + bpt.count / (double) totalKeys);
-
-        int expectedSize = (totalKeys + 1) / 2;
-        assert bpt.size () == expectedSize : "Size mismatch";
-        for (var i = 1; i <= 13; i += 2) {
-            assert bpt.get (i) != null && bpt.get (i).equals (i * i) : "Incorrect value for " + i;
+    public static void main(String[] args) {
+        // reference map
+        TreeMap<Integer,Integer> ref = new TreeMap<>();
+        // your B+‑tree
+        BpTreeMap<Integer,Integer> bpt = new BpTreeMap<>(Integer.class, Integer.class);
+    
+        // 1) INSERT TESTS
+        for (int k = 1; k <= 50; k++) {
+            int v = k * 10;
+            bpt.put(k, v);
+            ref.put(k, v);
+            // size must stay in sync
+            assert bpt.size() == ref.size()
+                : String.format("Size mismatch after put(%d): expected %d got %d",
+                                k, ref.size(), bpt.size());
         }
-        for (var i = 0; i <= totalKeys; i += 2) {
-            assert bpt.get (i) == null : "Unexpected value for " + i;
+    
+        // 2) GET TESTS (existing keys)
+        for (int k = 1; k <= 50; k++) {
+            Integer ev = ref.get(k);
+            Integer bv = bpt.get(k);
+            assert Objects.equals(bv, ev)
+                : String.format("Value mismatch at key %d: expected %d got %d",
+                                k, ev, bv);
         }
-    } // main
+    
+        // 3) GET TESTS (absent keys)
+        for (int k = 100; k < 110; k++) {
+            assert bpt.get(k) == null
+                : "Expected null for missing key " + k;
+        }
+    
+        System.out.println("✅ Insert/get tests passed.");
+    
+        // 4) REMOVE TESTS
+        int[] toRemove = { 5, 20, 35 };
+        for (int k : toRemove) {
+            Integer rb = bpt.remove(k);
+            Integer rr = ref.remove(k);
+            assert Objects.equals(rb, rr)
+                : String.format("Remove mismatch at key %d: expected %s got %s",
+                                k, rr, rb);
+        }
+    
+        // 5) POST‑REMOVE GET TESTS
+        for (int k = 1; k <= 50; k++) {
+            Integer ev = ref.get(k);
+            Integer bv = bpt.get(k);
+            assert Objects.equals(bv, ev)
+                : String.format("Post-remove mismatch at key %d: expected %s got %s",
+                                k, ev, bv);
+        }
+    
+        System.out.println("✅ Remove tests passed. All checks OK!");
+    }
+    
 
 } // BpTreeMap
 
